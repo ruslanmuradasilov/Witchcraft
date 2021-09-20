@@ -15,7 +15,7 @@ namespace Witchcraft
 		[Obsolete("This class is obsolete; use class CHUDO_YUDO instead")]
 		protected internal readonly ref partial struct CHUDO<T, U>
 			where T : unmanaged, IQbservable<T?>?
-			where U : new()
+			where U : class, new()
 		{
 			public abstract record Person(string FirstName, string LastName);
 
@@ -58,25 +58,38 @@ namespace Witchcraft
 
 			static bool IsLetter(char c) => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z');
 
-
-			static async IAsyncEnumerable<string> TakeFive(object input)
+#nullable disable
+			static async IAsyncEnumerator<U> TakeFive(IAsyncEnumerable<object> data)
 			{
-				yield return (await MakeWorkAsync(input) switch
+				await foreach (var _ in data)
 				{
-					string { Length: >= 5 } s => s.Substring(0, 5),
-					string s => s,
+					yield return (U)await new _()._(_) switch
+					{
+						string { Length: >= 5 } s => s.Substring(0, 5) as U,
+						string s => s as U,
 
-					ICollection<char> { Count: >= 5 } symbols => new string(symbols.Take(5).ToArray()),
-					ICollection<char> symbols => new string(symbols.ToArray()),
+						ICollection<char> { Count: >= 5 } symbols => new string(symbols.Take(5).ToArray()) as U,
+						ICollection<char> symbols => new string(symbols.ToArray()) as U,
 
-					null => throw new ArgumentNullException(nameof(input)),
-					_ => throw new ArgumentException("Not supported input type."),
-				}).Trim();
+						null => throw new ArgumentNullException(nameof(_)),
+						_ => throw new ArgumentException("Not supported input type."),
+					};
+				}
+				yield break;
 			}
+#nullable restore
 
-			static Task<object> MakeWorkAsync(object o)
+			class _ : IAsyncDisposable
 			{
-				return Task.FromResult(o);
+				public ValueTask DisposeAsync()
+				{
+					return ValueTask.CompletedTask;
+				}
+
+				public Task<object> _(object o)
+				{
+					return Task.FromResult(o);
+				}
 			}
 
 			static string TakeFive_old(object input)
